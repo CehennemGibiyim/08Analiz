@@ -67,7 +67,7 @@ export function appendScanHistory(history = [], markets = [], context = {}, time
       dataQualityGrade: analysis.intelligence?.dataQuality?.grade || 'D',
       dataGaps: analysis.intelligence?.dataQuality?.gaps || 0,
       regime: analysis.intelligence?.regime?.key || 'transition',
-      dataSource: dataSource || 'demo',
+      dataSource: dataSource || 'unavailable',
     };
   });
   const merged = [...history, ...events].slice(-HISTORY_LIMIT);

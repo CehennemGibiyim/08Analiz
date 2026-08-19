@@ -21,7 +21,7 @@ export function evaluateAlerts(events = [], settings = DEFAULT_ALERT_SETTINGS, w
     if (settings.mode === 'strength') return Number(event.confidence) >= threshold && event.signal !== 'wait';
     if (settings.mode === 'alignment') return Number(event.alignedCount || 0) >= alignmentThreshold;
     return event.changeType === 'changed' || event.signal === 'buy' || event.signal === 'sell';
-  }).map((event) => ({ id: `alert-${event.id}-${settings.mode}`, timestamp: event.timestamp, display: event.display, symbol: event.symbol, exchange: event.exchange, timeframe: event.timeframe, signal: event.signal, previousSignal: event.previousSignal, score: event.score, maxScore: event.maxScore, mode: settings.mode })).slice(-ALERT_LIMIT);
+  }).map((event) => ({ id: `alert-${event.id}-${settings.mode}`, timestamp: event.timestamp, display: event.display, symbol: event.symbol, exchange: event.exchange, timeframe: event.timeframe, signal: event.signal, previousSignal: event.previousSignal, score: event.score, maxScore: event.maxScore, mode: settings.mode, dataSource: event.dataSource || 'unavailable' })).slice(-ALERT_LIMIT);
 }
 
 export function mergeAlerts(existing = [], incoming = [], cooldownMinutes = 10) {

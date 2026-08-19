@@ -3,12 +3,12 @@ const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, Number(
 function finite(value, fallback = 0) { return Number.isFinite(Number(value)) ? Number(value) : fallback; }
 
 function timeframeMs(timeframe = '1h') {
-  return { '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '2h': 7200000, '4h': 14400000, '6h': 21600000, '12h': 43200000, '1d': 86400000, '1w': 604800000 }[timeframe] || 3600000;
+  return { '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '2h': 7200000, '4h': 14400000, '6h': 21600000, '12h': 43200000, '1d': 86400000, '1w': 604800000, '1M': 2592000000 }[timeframe] || 3600000;
 }
 
 function qualityGrade(score) { return score >= 85 ? 'A+' : score >= 75 ? 'A' : score >= 62 ? 'B' : score >= 48 ? 'C' : 'D'; }
 
-export function detectDataQuality(candles = [], { dataSource = 'demo', timeframe = '1h', candleClosed = false } = {}) {
+export function detectDataQuality(candles = [], { dataSource = 'unavailable', timeframe = '1h', candleClosed = false } = {}) {
   if (!Array.isArray(candles) || !candles.length) return { score: 0, grade: 'D', gaps: 0, stale: true, source: dataSource, ageMinutes: null, count: 0 };
   const timestamps = candles.map((candle) => Number(candle?.[0])).filter(Number.isFinite);
   const intervals = timestamps.slice(1).map((value, index) => value - timestamps[index]).filter((value) => value > 0);
@@ -19,7 +19,7 @@ export function detectDataQuality(candles = [], { dataSource = 'demo', timeframe
   const timestampMs = lastTimestamp < 100000000000 ? lastTimestamp * 1000 : lastTimestamp;
   const ageMinutes = timestampMs ? Math.max(0, (Date.now() - timestampMs) / 60000) : null;
   const stale = ageMinutes == null || ageMinutes > Math.max(15, expected / 60000 * 1.75);
-  const sourceScore = dataSource === 'live' ? 30 : 12;
+  const sourceScore = dataSource === 'live' ? 30 : 0;
   const countScore = Math.min(25, Math.round(candles.length / 300 * 25));
   const gapScore = gaps ? Math.max(0, 20 - gaps * 4) : 20;
   const freshnessScore = stale ? 4 : 15;
@@ -58,8 +58,8 @@ export function supportResistance(candles, price) {
   return { support, resistance, supportDistance: price ? Number(((price - support) / price * 100).toFixed(2)) : 0, resistanceDistance: price ? Number(((resistance - price) / price * 100).toFixed(2)) : 0 };
 }
 
-export function qualityScore({ analysis, dataSource = 'demo', market, dataQuality: qualityInfo } = {}) {
-  const sourceScore = dataSource === 'live' ? 25 : 10;
+export function qualityScore({ analysis, dataSource = 'unavailable', market, dataQuality: qualityInfo } = {}) {
+  const sourceScore = dataSource === 'live' ? 25 : 0;
   const candleScore = analysis?.candleClosed ? 15 : 7;
   const trendScore = clamp(finite(analysis?.trendConfidence, 50) * .2);
   const momentumScore = clamp(finite(analysis?.momentumConfidence, 50) * .15);

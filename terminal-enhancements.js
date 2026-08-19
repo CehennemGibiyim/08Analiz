@@ -9,7 +9,7 @@ let enhancementRenderKey = '';
 
 function renderHeatmap(overview) {
   if (!overview.rows.length) return `<div class="enhancement-empty">${esc(t('enhancements.empty'))}</div>`;
-  return overview.rows.slice(0, 18).map(({ market, analysis, dataSource }) => `<button class="heat-cell ${esc(analysis.signal)}" data-enhancement-symbol="${esc(market.symbol)}" type="button" title="${esc(market.display)}"><b>${esc(market.base)}</b><span>${signalText(analysis.signal)}</span><small>${num(analysis.change, 2)}% · ${esc(t(dataSource === 'live' ? 'enhancements.live' : 'enhancements.demo'))}</small></button>`).join('');
+  return overview.rows.slice(0, 18).map(({ market, analysis, dataSource }) => `<button class="heat-cell ${esc(analysis.signal)}" data-enhancement-symbol="${esc(market.symbol)}" type="button" title="${esc(market.display)}"><b>${esc(market.base)}</b><span>${signalText(analysis.signal)}</span><small>${num(analysis.change, 2)}% · ${esc(t(dataSource === 'live' ? 'enhancements.live' : 'status.unavailable'))}</small></button>`).join('');
 }
 
 function renderBacktestUpgrade(root, state) {

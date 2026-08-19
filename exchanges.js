@@ -9,17 +9,18 @@ const INTERVALS = {
   '12h': { binance: '12h', bybit: '720', okx: '12H', kucoin: '12hour', gate: '12h', bitget: '12H', kraken: 720 },
   '1d': { binance: '1d', bybit: 'D', okx: '1D', kucoin: '1day', gate: '1d', bitget: '1D', kraken: 1440 },
   '1w': { binance: '1w', bybit: 'W', okx: '1W', kucoin: '1week', gate: '7d', bitget: '1W', kraken: 10080 },
+  '1M': { binance: '1M', bybit: 'M', okx: '1M', kucoin: '1month', gate: '30d', bitget: '1M', kraken: 21600 },
 };
 const CANDLE_LIMIT = 300;
 
 export const EXCHANGES = {
-  binance: { name: 'Binance', region: 'Global', catalog: 'https://api.binance.com/api/v3/exchangeInfo' },
-  bybit: { name: 'Bybit', region: 'Global', catalog: 'https://api.bybit.com/v5/market/instruments-info?category=spot&limit=1000' },
-  okx: { name: 'OKX', region: 'Global', catalog: 'https://www.okx.com/api/v5/public/instruments?instType=SPOT' },
-  kucoin: { name: 'KuCoin', region: 'Global', catalog: 'https://api.kucoin.com/api/v2/symbols' },
-  gate: { name: 'Gate.io', region: 'Global', catalog: 'https://api.gateio.ws/api/v4/spot/currency_pairs' },
-  bitget: { name: 'Bitget', region: 'Global', catalog: 'https://api.bitget.com/api/v2/spot/public/symbols' },
-  kraken: { name: 'Kraken', region: 'Global', catalog: 'https://api.kraken.com/0/public/AssetPairs' },
+  binance: { name: 'Binance', region: 'Global', catalog: 'https://api.binance.com/api/v3/exchangeInfo', tickers: 'https://api.binance.com/api/v3/ticker/24hr' },
+  bybit: { name: 'Bybit', region: 'Global', catalog: 'https://api.bybit.com/v5/market/instruments-info?category=spot&limit=1000', tickers: 'https://api.bybit.com/v5/market/tickers?category=spot' },
+  okx: { name: 'OKX', region: 'Global', catalog: 'https://www.okx.com/api/v5/public/instruments?instType=SPOT', tickers: 'https://www.okx.com/api/v5/market/tickers?instType=SPOT' },
+  kucoin: { name: 'KuCoin', region: 'Global', catalog: 'https://api.kucoin.com/api/v2/symbols', tickers: 'https://api.kucoin.com/api/v1/market/allTickers' },
+  gate: { name: 'Gate.io', region: 'Global', catalog: 'https://api.gateio.ws/api/v4/spot/currency_pairs', tickers: 'https://api.gateio.ws/api/v4/spot/tickers' },
+  bitget: { name: 'Bitget', region: 'Global', catalog: 'https://api.bitget.com/api/v2/spot/public/symbols', tickers: 'https://api.bitget.com/api/v2/spot/market/tickers' },
+  kraken: { name: 'Kraken', region: 'Global', catalog: 'https://api.kraken.com/0/public/AssetPairs', tickers: '' },
 };
 
 export const exchangeKeys = Object.keys(EXCHANGES);
@@ -44,6 +45,26 @@ export function normalizeSymbol(raw, exchange) {
 
 function commonMarket(item, exchange, symbol, base, quote, quoteVolume = 0) {
   return { id: `${exchange}:${symbol}`, symbol, exchange, base, quote, display: `${base}/${quote}`, quoteVolume: Number(quoteVolume) || 0, raw: item };
+}
+
+function compactSymbol(value) { return String(value || '').replace(/[-_/:]/g, '').toUpperCase(); }
+
+export function parseTickerVolumes(exchange, payload) {
+  const rows = exchange === 'binance' ? payload
+    : exchange === 'bybit' ? payload.result?.list
+      : exchange === 'okx' ? payload.data
+        : exchange === 'kucoin' ? payload.data?.ticker
+          : exchange === 'gate' || exchange === 'bitget' ? payload.data || payload
+            : [];
+  if (!Array.isArray(rows)) return new Map();
+  const volumes = new Map();
+  rows.forEach((item) => {
+    const symbol = item.symbol || item.instId || item.currency_pair;
+    const volume = item.quoteVolume ?? item.quote_volume ?? item.turnover24h ?? item.volCcy24h ?? item.volValue;
+    const numericVolume = Number(volume);
+    if (symbol && Number.isFinite(numericVolume) && numericVolume >= 0) volumes.set(compactSymbol(symbol), numericVolume);
+  });
+  return volumes;
 }
 
 export function parseCatalog(exchange, payload) {
@@ -118,7 +139,3 @@ export function parseCandles(exchange, payload, market) {
   return candles.sort((a, b) => a[0] - b[0]).slice(-CANDLE_LIMIT);
 }
 
-export function fallbackCatalog(exchange) {
-  const bases = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'DOGE', 'ADA', 'AVAX', 'LINK', 'DOT', 'MATIC', 'LTC', 'ATOM', 'UNI', 'TRX'];
-  return bases.map((base) => commonMarket({}, exchange, exchange === 'okx' ? `${base}-USDT` : `${base}USDT`, base, 'USDT'));
-}

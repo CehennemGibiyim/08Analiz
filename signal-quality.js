@@ -8,7 +8,7 @@ export function qualityGrade(item = {}) {
 
 export function dataQuality(item = {}) {
   const quality = item.analysis?.intelligence?.dataQuality;
-  return quality || { score: 0, grade: 'D', gaps: 0, stale: true, source: item.dataSource || 'demo' };
+  return quality || { score: 0, grade: 'D', gaps: 0, stale: true, source: item.dataSource || 'unavailable' };
 }
 
 export function hasConfirmationConflict(confirmation = {}) {

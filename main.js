@@ -7,7 +7,7 @@ import { appendScanHistory, annotateMarkets } from './history.js';
 import { evaluateAlerts, mergeAlerts } from './alerts.js';
 import { render, bindEvents, applyTranslations } from './ui.js';
 import { refreshSignalAges } from './signal-age.js';
-import { sparklinePoints } from './indicators.js';
+import { sparklinePoints, INDICATOR_IDS, GATE_INDICATOR_IDS } from './indicators.js';
 import { applyStrategyProfile, tradePlan } from './strategy.js';
 import { runBacktest } from './backtest.js';
 import { createTickerStream } from './live-stream.js';
@@ -20,6 +20,8 @@ import { renderSignalMeta } from './signal-meta.js';
 import { renderProTerminal, bindProTerminalEvents } from './pro-terminal.js';
 import { renderPaperTrading, bindPaperTradingEvents, currentPaperPrices, settlePaperTrades } from './paper-trading.js';
 import { renderSignalInsights } from './signal-insights.js';
+import { renderLiveDataUi } from './live-data-ui.js';
+import { bindSidebar, syncSidebar } from './sidebar.js';
 
 window.indicators = { sparklinePoints };
 const root = document.querySelector('#app'); const store = createStore();
@@ -29,7 +31,7 @@ const t = (key, values) => window.miniappI18n?.t(key, values) ?? key;
 let persistTimer;
 function persistIfNeeded(state) { if (state.status !== 'loading' && state.catalogStatus !== 'loading') { clearTimeout(persistTimer); persistTimer = setTimeout(() => savePreferences(state), 400); } }
 function configureAutoRefresh(value) { window.clearInterval(autoRefreshTimer); autoRefreshTimer = 0; const seconds = Number(value); if (seconds > 0) autoRefreshTimer = window.setInterval(() => refresh(), seconds * 1000); }
-function applyPreset(id) { const state = store.getState(); const preset = [...DEFAULT_PRESETS, ...(state.presets || [])].find((item) => item.id === id); if (!preset) return; store.setState({ strategyProfile: preset.profile, selectedIndicators: [...preset.indicators], confirmationTimeframes: [...preset.timeframes], signalFilter: 'all', watchlistOnly: false }); refresh(); }
+function applyPreset(id) { const state = store.getState(); const preset = [...DEFAULT_PRESETS, ...(state.presets || [])].find((item) => item.id === id); if (!preset) return; const indicatorSource = state.exchange === 'gate' && preset.indicators.some((item) => String(item).startsWith('gate_')) ? 'gate' : 'core'; store.setState({ strategyProfile: preset.profile, indicatorSource, selectedIndicators: [...preset.indicators], confirmationTimeframes: [...preset.timeframes], signalFilter: 'all', watchlistOnly: false }); refresh(); }
 function saveNote(value) { const state = store.getState(); store.setState({ notes: { ...(state.notes || {}), [state.selectedSymbol]: String(value).slice(0, 500) } }); }
 function savePreset() { const state = store.getState(); const preset = { id: `custom-${Date.now()}`, name: t('enhancements.customPreset', { time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) }), profile: state.strategyProfile, indicators: [...state.selectedIndicators], timeframes: [...state.confirmationTimeframes] }; store.setState({ presets: [...(state.presets || []).slice(-7), preset] }); }
 function setSlippage(value) { store.setState({ backtestSettings: { ...store.getState().backtestSettings, slippagePercent: Math.max(0, Number(value) || 0) } }); }
@@ -39,7 +41,7 @@ async function requestNotifications() { if (!('Notification' in window)) return;
 function notifyAlerts(alerts = []) { const state = store.getState(); if (state.notifications !== 'granted' || !window.Notification || !alerts.length) return; const alert = alerts[alerts.length - 1]; try { new Notification(`${alert.display} · ${t(`signal.${alert.signal}`)}`, { body: t('alerts.notificationBody', { timeframe: alert.timeframe }) }); } catch {} }
 function sameSymbol(left, right) { return String(left || '').replace(/[-_/:]/g, '').toUpperCase() === String(right || '').replace(/[-_/:]/g, '').toUpperCase(); }
 function preferredMarket(catalog, selectedSymbol) { return catalog.find((item) => item.symbol === selectedSymbol) || catalog.find((item) => sameSymbol(item.symbol, selectedSymbol)) || catalog.find((item) => item.base === 'BTC' && ['USDT', 'USD', 'USDC'].includes(item.quote)) || catalog[0]; }
-function scanUniverse(state) { const selected = preferredMarket(state.catalog, state.selectedSymbol); if (!selected) return []; const related = state.catalog.filter((item) => item.quote === selected.quote && item.symbol !== selected.symbol); return [...new Map([selected, ...related].slice(0, 24).map((item) => [item.symbol, item])).values()]; }
+function scanUniverse(state) { const selected = preferredMarket(state.catalog, state.selectedSymbol); const ordered = state.catalog.slice().sort((left, right) => Number(right.quoteVolume || 0) - Number(left.quoteVolume || 0)); if (!selected) return ordered; return [selected, ...ordered.filter((item) => item.symbol !== selected.symbol)]; }
 
 async function refreshConfirmation(symbol = store.getState().selectedSymbol) {
   const state = store.getState(); const marketResult = state.markets.find((item) => sameSymbol(item.market.symbol, symbol)); const market = marketResult?.market || preferredMarket(state.catalog, symbol); if (!market) return;
@@ -57,10 +59,17 @@ function startTickerStream() {
 }
 
 async function refresh() {
-  const state = store.getState(); if (!state.catalog.length) return undefined;
+  const state = store.getState();
+  if (!state.catalog.length) {
+    if (state.catalogStatus !== 'loading') store.setState({ status: 'error', source: 'unavailable', error: state.error || 'market_unavailable' });
+    return undefined;
+  }
   const scanKey = [state.exchange, state.timeframe, state.selectedSymbol, [...state.selectedIndicators].sort().join(','), state.strategyProfile].join('|'); if (refreshPromise && activeScanKey === scanKey) return refreshPromise;
   const requestToken = ++scanToken; activeScanKey = scanKey; store.setState({ status: 'loading', error: '' });
-  const request = loadMarkets(state.exchange, state.timeframe, scanUniverse(state), state.selectedIndicators).then((result) => {
+  const request = loadMarkets(state.exchange, state.timeframe, scanUniverse(state), state.selectedIndicators, (progress) => {
+    if (requestToken !== scanToken) return;
+    store.setState({ markets: progress.markets, source: progress.live > 0 ? 'partial' : 'unavailable', error: progress.live > 0 ? 'partial_market_unavailable' : 'market_unavailable', scanStats: progress, status: 'loading', updatedAt: progress.live > 0 ? Date.now() : null });
+  }).then((result) => {
     if (requestToken !== scanToken) return; const selected = result.markets.some((item) => sameSymbol(item.market.symbol, state.selectedSymbol)) ? state.selectedSymbol : result.markets[0]?.market.symbol; const context = { exchange: state.exchange, timeframe: state.timeframe };
     const historyPack = appendScanHistory(state.history, result.markets, context); const markets = annotateMarkets(result.markets, state.history, context); const newAlerts = evaluateAlerts(historyPack.events, state.alertSettings, state.watchlist);
     const recentAlerts = mergeAlerts(state.recentAlerts, newAlerts, state.alertSettings?.cooldownMinutes); const acceptedAlerts = recentAlerts.filter((item) => !state.recentAlerts.some((old) => old.id === item.id)); notifyAlerts(acceptedAlerts);
@@ -73,14 +82,14 @@ async function refresh() {
 
 async function loadExchangeCatalog(exchange) {
   const token = ++catalogToken; scanToken += 1; confirmationToken += 1; refreshPromise = null; activeScanKey = ''; tickerStream?.close();
-  store.setState({ exchange, catalogStatus: 'loading', status: 'loading', markets: [], confirmation: { status: 'idle', timeframes: [], analyses: {}, error: '' }, streamStatus: 'off', error: '' }); const result = await loadCatalog(exchange); if (token !== catalogToken) return;
+  const source = exchange === 'gate' ? 'gate' : 'core'; const indicators = source === 'gate' ? GATE_INDICATOR_IDS : INDICATOR_IDS; store.setState({ exchange, indicatorSource: source, selectedIndicators: [...indicators], catalogStatus: 'loading', status: 'loading', markets: [], confirmation: { status: 'idle', timeframes: [], analyses: {}, error: '' }, streamStatus: 'off', scanStats: { requested: 0, completed: 0, live: 0, unavailable: 0 }, error: '' }); const result = await loadCatalog(exchange); if (token !== catalogToken) return;
   const selected = preferredMarket(result.catalog, store.getState().selectedSymbol); store.setState({ catalog: result.catalog, catalogStatus: 'ready', selectedSymbol: selected?.symbol || '', error: result.error, systemHealth: result.health || store.getState().systemHealth }); await refresh();
 }
-function chooseSymbol(value) { const state = store.getState(); const selected = state.catalog.find((item) => item.symbol.toUpperCase() === value.trim().toUpperCase()) || state.catalog.find((item) => item.display.toUpperCase() === value.trim().toUpperCase()) || state.catalog.find((item) => sameSymbol(item.symbol, value.trim())); if (!selected) return; store.setState({ selectedSymbol: selected.symbol, query: '', signalFilter: 'all', watchlistOnly: false }); refreshConfirmation(selected.symbol); }
+function chooseSymbol(value) { const state = store.getState(); const selected = state.catalog.find((item) => item.symbol.toUpperCase() === value.trim().toUpperCase()) || state.catalog.find((item) => item.display.toUpperCase() === value.trim().toUpperCase()) || state.catalog.find((item) => sameSymbol(item.symbol, value.trim())); if (!selected) return; store.setState({ selectedSymbol: selected.symbol, query: '', signalFilter: 'all', watchlistOnly: false }); refresh(); }
 function selectSymbol(symbol) { store.setState({ selectedSymbol: symbol }); refreshConfirmation(symbol); }
 function toggleWatch() { const state = store.getState(); const symbol = state.selectedSymbol; const watchlist = state.watchlist.some((item) => sameSymbol(item, symbol)) ? state.watchlist.filter((item) => !sameSymbol(item, symbol)) : [...state.watchlist, symbol]; store.setState({ watchlist }); }
 function openPaperTrade(data = {}) {
-  const state = store.getState(); const item = state.markets.find((entry) => sameSymbol(entry.market.symbol, state.selectedSymbol)); if (!item) return;
+  const state = store.getState(); const item = state.markets.find((entry) => sameSymbol(entry.market.symbol, state.selectedSymbol)); if (!item || (data.quick && !['buy', 'sell'].includes(item.analysis.signal))) return;
   const ticker = state.tickers?.[item.market.symbol] || state.tickers?.[String(item.market.symbol).replace(/[-_/:]/g, '').toUpperCase()];
   const entry = Number(data.quick ? (ticker?.price || item.analysis.price) : data.entry) || 0;
   const side = data.quick ? (item.analysis.signal === 'sell' ? 'short' : 'long') : data.side === 'short' ? 'short' : 'long';
@@ -101,6 +110,7 @@ function changeAdvancedFilter(key, value) { store.setState({ [key]: value }); }
 function changeStrengthFilter(value) { store.setState({ strengthFilter: ['all', 'strong'].includes(value) ? value : 'all' }); }
 function toggleWatchlistFilter() { const state = store.getState(); const watchlistOnly = !state.watchlistOnly; const matching = state.markets.filter((item) => !watchlistOnly || state.watchlist.some((symbol) => sameSymbol(symbol, item.market.symbol))); store.setState({ watchlistOnly, selectedSymbol: matching[0]?.market.symbol || state.selectedSymbol }); if (matching[0]) refreshConfirmation(matching[0].market.symbol); }
 function changeIndicators(selectedIndicators) { store.setState({ selectedIndicators }); refresh(); }
+function changeIndicatorSource(source) { const next = source === 'gate' && store.getState().exchange === 'gate' ? 'gate' : 'core'; store.setState({ indicatorSource: next, selectedIndicators: [...(next === 'gate' ? GATE_INDICATOR_IDS : INDICATOR_IDS)] }); refresh(); }
 function changeConfirmationTimeframes(timeframes) { store.setState({ confirmationTimeframes: timeframes }); refreshConfirmation(); }
 function updateAlertSettings(patch) {
   const current = store.getState().alertSettings || {};
@@ -113,8 +123,8 @@ function updateAlertSettings(patch) {
 }
 function clearAlerts() { store.setState({ recentAlerts: [] }); }
 function updateRisk(risk) { store.setState({ risk: { ...store.getState().risk, ...risk } }); }
-function applyProfile(profileId) { store.setState({ ...applyStrategyProfile(profileId, store.getState()) }); refresh(); }
-function applyPlanToRisk() { const state = store.getState(); const item = state.markets.find((entry) => sameSymbol(entry.market.symbol, state.selectedSymbol)); if (!item) return; const plan = tradePlan(item.analysis); updateRisk({ entry: plan.entry, stop: plan.stop }); root.querySelector('#riskPanel')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+function applyProfile(profileId) { store.setState({ indicatorSource: 'core', ...applyStrategyProfile(profileId, store.getState()) }); refresh(); }
+function applyPlanToRisk() { const state = store.getState(); const item = state.markets.find((entry) => sameSymbol(entry.market.symbol, state.selectedSymbol)); if (!item) return; const plan = tradePlan(item.analysis); updateRisk({ entry: plan.entry, stop: plan.stop }); root.querySelector('[data-sidebar-target="toolsSection"]')?.click(); window.setTimeout(() => root.querySelector('#riskPanel')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80); }
 function runSelectedBacktest(options = {}) { const state = store.getState(); const item = state.markets.find((entry) => sameSymbol(entry.market.symbol, state.selectedSymbol)); if (!item) return; const read = (id, fallback = 0) => Number(root.querySelector(`#${id}`)?.value ?? fallback) || fallback; const costs = { spreadPercent: read('backtestSpread', 0.04), fundingPercent: read('backtestFunding', 0) }; store.setState({ backtest: runBacktest(item.candles, { ...options, ...costs, ...state.backtestSettings, indicators: state.selectedIndicators, timeframe: state.timeframe }) }); }
 function addPosition(data) { const state = store.getState(); store.setState({ positions: [...state.positions, normalizePosition({ ...data, symbol: data.symbol || state.selectedSymbol })] }); }
 function removePosition(id) { store.setState({ positions: store.getState().positions.filter((position) => position.id !== id) }); }
@@ -126,14 +136,15 @@ async function boot() {
   await (window.githubI18nReady || Promise.resolve());
   await startAuth({ app: root, onAuthenticated: async () => {
     const preferences = await loadPreferences(); store.setState(preferences); applyTranslations();
+    bindSidebar(root);
     bindChartScroll(root);
-    bindEvents(root, { refresh, toggleWatch, changeSignalFilter, selectSymbol, chooseSymbol, changeIndicators, changeStrengthFilter, toggleWatchlistFilter, changeConfirmationTimeframes, updateAlertSettings, clearAlerts, updateRisk, changeAdvancedFilter, applyProfile, applyPlanToRisk, runSelectedBacktest, addPosition, removePosition, exportData, openPaperTrade, closePaperTrade, search: (query) => { clearTimeout(searchTimer); searchTimer = window.setTimeout(() => store.setState({ query }), 120); }, changeTimeframe: (timeframe) => { store.setState({ timeframe }); refresh(); }, changeExchange: (exchange) => loadExchangeCatalog(exchange) });
+    bindEvents(root, { getState: () => store.getState(), refresh, toggleWatch, changeSignalFilter, selectSymbol, chooseSymbol, changeIndicators, changeIndicatorSource, changeStrengthFilter, toggleWatchlistFilter, changeConfirmationTimeframes, updateAlertSettings, clearAlerts, updateRisk, changeAdvancedFilter, applyProfile, applyPlanToRisk, runSelectedBacktest, addPosition, removePosition, exportData, openPaperTrade, closePaperTrade, search: (query) => { clearTimeout(searchTimer); searchTimer = window.setTimeout(() => store.setState({ query }), 120); }, changeTimeframe: (timeframe) => { store.setState({ timeframe }); refresh(); }, changeExchange: (exchange) => loadExchangeCatalog(exchange) });
     root.addEventListener('change', (event) => { if (event.target.id === 'alertsLiveOnly') updateAlertSettings({ liveOnly: event.target.checked }); if (event.target.id === 'alertsClosedOnly') updateAlertSettings({ closedOnly: event.target.checked }); if (event.target.id === 'qualitySelect') store.setState({ qualityFilter: ['all', 'aplus', 'a', 'b'].includes(event.target.value) ? event.target.value : 'all' }); if (event.target.id === 'confirmedOnly') store.setState({ confirmedOnly: event.target.checked }); if (event.target.id === 'liveQualityOnly') store.setState({ liveQualityOnly: event.target.checked }); });
     root.addEventListener('click', (event) => { if (event.target.closest('[data-chart-action="toggle-stream"]')) store.setState({ liveUpdatesPaused: !store.getState().liveUpdatesPaused }); });
     bindEnhancementEvents(root, { selectSymbol, applyPreset, saveNote, savePreset, setSlippage, setAlertCooldown, requestNotifications, setAutoRefresh: (value) => { store.setState({ autoRefresh: value === 'off' ? 'off' : Number(value) }); configureAutoRefresh(value); } });
     bindProTerminalEvents(root, { updateGuardrails });
     bindPaperTradingEvents(root, { openPaperTrade, closePaperTrade });
-    store.subscribe((state) => { render(root, state); renderSignalMeta(root, state); renderEnhancements(root, state); renderProTerminal(root, state); renderSignalInsights(root, state); renderPaperTrading(root, state); syncChartStreamControl(state); persistIfNeeded(state); }); render(root, store.getState()); renderSignalMeta(root, store.getState()); renderEnhancements(root, store.getState()); renderProTerminal(root, store.getState()); renderSignalInsights(root, store.getState()); renderPaperTrading(root, store.getState()); syncChartStreamControl(store.getState()); configureAutoRefresh(store.getState().autoRefresh); window.setInterval(() => refreshSignalAges(root, t), 5000); await loadExchangeCatalog(store.getState().exchange);
+    store.subscribe((state) => { render(root, state); renderSignalMeta(root, state); renderEnhancements(root, state); renderProTerminal(root, state); renderSignalInsights(root, state); renderPaperTrading(root, state); renderLiveDataUi(root, state); syncSidebar(root, state); syncChartStreamControl(state); persistIfNeeded(state); }); render(root, store.getState()); renderSignalMeta(root, store.getState()); renderEnhancements(root, store.getState()); renderProTerminal(root, store.getState()); renderSignalInsights(root, store.getState()); renderPaperTrading(root, store.getState()); renderLiveDataUi(root, store.getState()); syncSidebar(root, store.getState()); syncChartStreamControl(store.getState()); configureAutoRefresh(store.getState().autoRefresh); window.setInterval(() => refreshSignalAges(root, t), 5000); await loadExchangeCatalog(store.getState().exchange);
   } });
 }
 boot();

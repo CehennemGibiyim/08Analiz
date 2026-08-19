@@ -20,7 +20,7 @@ function grade(quality = {}) {
 function systemRows(state, freshnessInfo) {
   const health = state.systemHealth || {};
   return [
-    [t('pro.healthSource'), state.source === 'live' ? t('pro.live') : state.source === 'mixed' ? t('pro.mixed') : t('pro.demo')],
+    [t('pro.healthSource'), state.source === 'live' ? t('pro.live') : state.source === 'partial' ? t('pro.partial') : t('pro.unavailable')],
     [t('pro.healthAge'), freshnessInfo.ageMs === Infinity ? '—' : `${num(freshnessInfo.ageMs / 1000, 0)} ${t('pro.seconds')}`],
     [t('pro.healthApi'), health.lastLatencyMs ? `${num(health.lastLatencyMs, 0)} ms` : '—'],
     [t('pro.healthRequests'), health.requests ? num(health.requests, 0) : '—'],
@@ -54,7 +54,7 @@ export function renderProTerminal(root, state) {
   if (dailyLoss > Number(limits.maxDailyLossPercent)) warnings.push(t('pro.warningDailyLoss', { value: num(dailyLoss, 2), limit: num(limits.maxDailyLossPercent, 2) }));
   if (largestExposure > Number(limits.maxPositionExposurePercent)) warnings.push(t('pro.warningExposure', { value: num(largestExposure, 2), limit: num(limits.maxPositionExposurePercent, 2) }));
   if (freshnessInfo.stale) warnings.push(t('pro.warningStale'));
-  if (state.source !== 'live') warnings.push(t('pro.warningDemo'));
+  if (state.source !== 'live') warnings.push(t('pro.warningUnavailable'));
   mount.innerHTML = `<section class="pro-terminal" aria-labelledby="proTerminalTitle"><div class="pro-heading"><div><p class="eyebrow accent">${esc(t('pro.eyebrow'))}</p><h2 id="proTerminalTitle">${esc(t('pro.title'))}</h2><p>${esc(t('pro.copy'))}</p></div><span class="pro-grade grade-${esc(grade(selectedQuality))}">${esc(t('pro.selectedQuality'))}: ${esc(grade(selectedQuality))}</span></div><div class="pro-grid"><article class="pro-card"><div class="section-label"><span>${esc(t('pro.regimeTitle'))}</span><strong>${marketRows.length}</strong></div><div class="pro-chip-list">${regimes}</div><div class="pro-subtitle">${esc(t('pro.qualityTitle'))}</div><div class="pro-chip-list quality-list">${gradeRows}</div></article><article class="pro-card"><div class="section-label"><span>${esc(t('pro.outcomeTitle'))}</span><strong>${esc(t('pro.realized'))}</strong></div><p class="pro-muted">${esc(t('pro.outcomeCopy'))}</p><div class="pro-outcomes">${horizonRows}</div></article><article class="pro-card"><div class="section-label"><span>${esc(t('pro.healthTitle'))}</span><strong class="${freshnessInfo.stale ? 'negative' : 'positive'}">${esc(t(`enhancements.freshness.${freshnessInfo.label}`))}</strong></div><div class="pro-health">${healthRows}</div></article><article class="pro-card"><div class="section-label"><span>${esc(t('pro.guardTitle'))}</span><strong class="${risk.riskPercent > Number(limits.maxPortfolioRiskPercent) ? 'negative' : 'positive'}">${num(risk.riskPercent, 2)}%</strong></div><div class="pro-guard-fields"><label>${esc(t('pro.maxRisk'))}<input type="number" min="0" step="0.1" data-pro-guard="maxPortfolioRiskPercent" value="${esc(limits.maxPortfolioRiskPercent)}"></label><label>${esc(t('pro.maxDailyLoss'))}<input type="number" min="0" step="0.1" data-pro-guard="maxDailyLossPercent" value="${esc(limits.maxDailyLossPercent)}"></label><label>${esc(t('pro.maxExposure'))}<input type="number" min="0" step="1" data-pro-guard="maxPositionExposurePercent" value="${esc(limits.maxPositionExposurePercent)}"></label></div><small class="pro-muted">${esc(warnings.join(' · ') || t('pro.guardOk'))}</small></article></div></section>`;
 }
 

@@ -16,6 +16,7 @@ export const DEFAULT_STATE = {
   watchlistOnly: false,
   query: '',
   selectedSymbol: 'BTCUSDT',
+  indicatorSource: 'core',
   selectedIndicators: [...INDICATOR_IDS],
   confirmationTimeframes: ['1h', '4h', '1d'],
   watchlist: ['BTCUSDT', 'ETHUSDT'],
@@ -23,7 +24,7 @@ export const DEFAULT_STATE = {
   catalogStatus: 'idle',
   markets: [],
   status: 'idle',
-  source: 'demo',
+  source: 'unavailable',
   error: '',
   updatedAt: null,
   history: [],
@@ -44,6 +45,7 @@ export const DEFAULT_STATE = {
   backtestSettings: { slippagePercent: 0.05 },
   riskGuardrails: { maxPortfolioRiskPercent: 3, maxDailyLossPercent: 3, maxPositionExposurePercent: 25 },
   systemHealth: { requests: 0, lastLatencyMs: 0, lastSuccessAt: 0, lastError: '' },
+  scanStats: { requested: 0, completed: 0, live: 0, unavailable: 0 },
 };
 
 export function createStore(initial = {}) {

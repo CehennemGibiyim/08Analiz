@@ -1,4 +1,4 @@
-import { INDICATOR_IDS } from './indicators.js';
+import { ALL_INDICATOR_IDS } from './indicators.js';
 import { DEFAULT_ALERT_SETTINGS } from './alerts.js';
 
 const STORAGE_KEY = 'signal-terminal-preferences-v4';
@@ -72,7 +72,7 @@ export async function removeStoredItem(key, options = {}) {
 }
 
 function safeHistory(value) {
-  return Array.isArray(value) ? value.filter((item) => item && item.symbol && item.signal).slice(-360) : [];
+  return Array.isArray(value) ? value.filter((item) => item && item.symbol && item.signal && item.dataSource === 'live').slice(-360) : [];
 }
 
 export async function loadPreferences() {
@@ -85,6 +85,7 @@ export async function loadPreferences() {
       exchange: parsed.exchange || 'binance',
       timeframe: parsed.timeframe || '1h',
       selectedSymbol: parsed.selectedSymbol || 'BTCUSDT',
+      indicatorSource: parsed.indicatorSource === 'gate' ? 'gate' : 'core',
       strengthFilter: parsed.strengthFilter || 'all',
       qualityFilter: ['all', 'aplus', 'a', 'b'].includes(parsed.qualityFilter) ? parsed.qualityFilter : 'all',
       confirmedOnly: Boolean(parsed.confirmedOnly),
@@ -96,7 +97,7 @@ export async function loadPreferences() {
       watchlistOnly: Boolean(parsed.watchlistOnly),
       confirmationTimeframes: Array.isArray(parsed.confirmationTimeframes) ? parsed.confirmationTimeframes : ['1h', '4h', '1d'],
       history: safeHistory(parsed.history),
-      recentAlerts: Array.isArray(parsed.recentAlerts) ? parsed.recentAlerts.slice(-40) : [],
+      recentAlerts: Array.isArray(parsed.recentAlerts) ? parsed.recentAlerts.filter((item) => item?.dataSource === 'live').slice(-40) : [],
       alertSettings: { ...DEFAULT_ALERT_SETTINGS, ...(parsed.alertSettings || {}) },
       risk: { balance: 1000, riskPercent: 1, entry: 0, stop: 0, feePercent: 0.1, ...(parsed.risk || {}) },
       positions: Array.isArray(parsed.positions) ? parsed.positions : [],
@@ -109,7 +110,7 @@ export async function loadPreferences() {
       riskGuardrails: { maxPortfolioRiskPercent: 3, maxDailyLossPercent: 3, maxPositionExposurePercent: 25, ...(parsed.riskGuardrails || {}) },
     };
     if (Array.isArray(parsed.watchlist)) preferences.watchlist = parsed.watchlist;
-    if (Array.isArray(parsed.selectedIndicators)) preferences.selectedIndicators = parsed.selectedIndicators.filter((id) => INDICATOR_IDS.includes(id));
+    if (Array.isArray(parsed.selectedIndicators)) preferences.selectedIndicators = parsed.selectedIndicators.filter((id) => ALL_INDICATOR_IDS.includes(id));
     return preferences;
   } catch { return {}; }
 }
@@ -120,6 +121,7 @@ export async function savePreferences(state) {
       exchange: state.exchange,
       timeframe: state.timeframe,
       selectedSymbol: state.selectedSymbol,
+      indicatorSource: state.indicatorSource || 'core',
       selectedIndicators: state.selectedIndicators,
       watchlist: state.watchlist,
       strengthFilter: state.strengthFilter,

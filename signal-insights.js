@@ -22,7 +22,7 @@ function calibration(history, horizon, state) {
   return { sample: samples.length, accuracy: samples.length ? clamp(wins / samples.length * 100) : null };
 }
 
-function sourceLabel(value) { return value === 'live' ? t('insights.live') : value === 'mixed' ? t('insights.mixed') : t('insights.demo'); }
+function sourceLabel(value) { return value === 'live' ? t('insights.live') : value === 'partial' ? t('insights.partial') : t('insights.unavailable'); }
 function dataAgeLabel(quality) { return quality.ageMinutes == null ? '—' : `${quality.ageMinutes} ${t('insights.minutes')}`; }
 
 export function renderSignalInsights(root, state) {

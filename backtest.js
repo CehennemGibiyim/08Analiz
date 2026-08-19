@@ -16,7 +16,7 @@ export function runBacktest(candles = [], options = {}) {
   let balance = initial; let peak = initial; let maxDrawdown = 0; let position = null; let wins = 0; let losses = 0; let grossProfit = 0; let grossLoss = 0;
   let longTrades = 0; let shortTrades = 0; let winStreak = 0; let lossStreak = 0; let maxWinStreak = 0; let maxLossStreak = 0; let totalCosts = 0;
   for (let index = 80; index < candles.length; index += 1) {
-    const slice = candles.slice(0, index + 1); const analysis = analyzeCandles(slice, selected, options.timeframe || '1h'); const close = num(candles[index][4]); const high = num(candles[index][2]); const low = num(candles[index][3]); const atr = Math.max(num(analysis.atr), close * .003);
+    const slice = candles.slice(0, index + 1); const analysis = analyzeCandles(slice, selected, options.timeframe || '1h', { timingTimestamp: Number(candles[index][0]) + 360000 }); const close = num(candles[index][4]); const high = num(candles[index][2]); const low = num(candles[index][3]); const atr = Math.max(num(analysis.atr), close * .003);
     if (!position && ['buy', 'sell'].includes(analysis.signal)) {
       const direction = analysis.signal === 'buy' ? 1 : -1; const riskDistance = atr * stopAtr;
       position = { entry: close, direction, stop: close - direction * riskDistance, target: close + direction * riskDistance * reward, openedAt: index, signal: analysis.signal };
