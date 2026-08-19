@@ -1,0 +1,7 @@
+.indicator-source-field { flex: 0 1 190px; min-width: 180px; }
+.indicator-source-field .field-hint { min-height: 28px; line-height: 1.35; }
+#gateIndicatorPicker[hidden], .indicator-picker[hidden] { display: none !important; }
+@media (max-width: 900px) {
+  .indicator-source-field { flex: 1 1 100%; }
+  .indicator-source-field .field-hint { min-height: 0; }
+}

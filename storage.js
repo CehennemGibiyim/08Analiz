@@ -104,7 +104,7 @@ export async function loadPreferences() {
       paperTrading: { balance: 1000, open: Array.isArray(parsed.paperTrading?.open) ? parsed.paperTrading.open.slice(-40) : [], closed: Array.isArray(parsed.paperTrading?.closed) ? parsed.paperTrading.closed.slice(-120) : [] },
       presets: Array.isArray(parsed.presets) ? parsed.presets.slice(0, 8) : [],
       notes: parsed.notes && typeof parsed.notes === 'object' ? parsed.notes : {},
-      autoRefresh: [60, 180, 'off'].includes(parsed.autoRefresh) ? parsed.autoRefresh : 'off',
+      autoRefresh: [60, 180].includes(parsed.autoRefresh) ? parsed.autoRefresh : 60,
       notifications: parsed.notifications || 'default',
       backtestSettings: { slippagePercent: 0.05, ...(parsed.backtestSettings || {}) },
       riskGuardrails: { maxPortfolioRiskPercent: 3, maxDailyLossPercent: 3, maxPositionExposurePercent: 25, ...(parsed.riskGuardrails || {}) },

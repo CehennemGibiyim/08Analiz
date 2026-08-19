@@ -40,7 +40,7 @@ export const DEFAULT_STATE = {
   backtest: null,
   presets: [],
   notes: {},
-  autoRefresh: 'off',
+  autoRefresh: 60,
   notifications: 'default',
   backtestSettings: { slippagePercent: 0.05 },
   riskGuardrails: { maxPortfolioRiskPercent: 3, maxDailyLossPercent: 3, maxPositionExposurePercent: 25 },

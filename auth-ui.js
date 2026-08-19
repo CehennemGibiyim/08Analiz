@@ -12,7 +12,7 @@ import {
   updatePassword,
   updateUserAccess,
 } from './auth.js';
-import { bindProjectDownload } from './project-download.js';
+import { bindProjectDownload } from './project-download.js?v=20260819-4';
 
 const t = (key, values) => window.miniappI18n?.t(key, values) ?? key;
 function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&#38;', '<': '&#60;', '>': '&#62;', "'": '&#39;', '"': '&#34;' }[char])); }
@@ -88,6 +88,13 @@ export async function startAuth({ app, onAuthenticated }) {
   translateAuth();
   bindProjectDownload();
   bindPasswordToggles();
+
+  // Geçici bakım modu: GitHub Pages dağıtımında Supabase oturumu uygulamanın önünü kesmez.
+  // Auth ekranı ve form akışları dosyada korunur; yeniden etkinleştirmek için bu blok kaldırılabilir.
+  gate.hidden = true;
+  app.hidden = false;
+  onAuthenticated({ id: 'temporary-access', username: 'temporary', role: 'guest', profileReady: true, token: '', supabase: false, loggedAt: Date.now() });
+  return;
 
   function setMode(mode) {
     const isLogin = mode === 'login';

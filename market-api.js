@@ -14,7 +14,7 @@ function validateCandles(candles = []) {
 
 export function getSystemHealth() { return { ...apiHealth }; }
 
-async function fetchJson(url, timeoutMs = 10000) {
+async function fetchJson(url, timeoutMs = 6500) {
   const startedAt = Date.now(); apiHealth.requests += 1; const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs);
   try { const response = await fetch(url, { signal: controller.signal, cache: 'no-store', headers: { Accept: 'application/json' } }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const payload = await response.json(); if (payload == null || typeof payload !== 'object') throw new Error('invalid_json_payload'); apiHealth.lastLatencyMs = Date.now() - startedAt; apiHealth.lastSuccessAt = Date.now(); apiHealth.lastError = ''; return payload; }
   catch (error) { apiHealth.lastLatencyMs = Date.now() - startedAt; apiHealth.lastError = error?.message || 'request_failed'; throw error; }
@@ -54,10 +54,10 @@ export async function loadMarkets(exchange, timeframe, markets, selectedIndicato
   const selected = [...new Map(markets.filter((market) => market?.symbol).map((market) => [market.symbol, market])).values()];
   const liveResults = [];
   let completed = 0;
-  const batchSize = 48;
+  const batchSize = 96;
   for (let start = 0; start < selected.length; start += batchSize) {
     const batch = selected.slice(start, start + batchSize);
-    const results = await mapWithConcurrency(batch, 12, (market) => loadOneMarket(exchange, timeframe, market, selectedIndicators));
+    const results = await mapWithConcurrency(batch, 24, (market) => loadOneMarket(exchange, timeframe, market, selectedIndicators));
     liveResults.push(...results.filter((item) => item.live && item.result));
     completed += batch.length;
     onProgress?.({ markets: liveResults.map((item) => item.result), requested: selected.length, completed, live: liveResults.length, unavailable: completed - liveResults.length });

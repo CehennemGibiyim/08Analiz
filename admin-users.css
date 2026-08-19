@@ -1,0 +1,12 @@
+.user-actions { flex-wrap: wrap; justify-content: flex-end; }
+.user-role-select { min-height: 32px; min-width: 88px; padding: 0 8px; border: 1px solid rgba(73,227,194,.22); border-radius: 8px; background: rgba(7,17,31,.72); color: var(--ink); font: inherit; font-size: 10px; font-weight: 800; }
+.user-role-select:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.user-row.is-inactive { background: rgba(242,182,109,.045); }
+.user-row.is-inactive b { color: var(--muted); }
+.user-row.is-editing { background: rgba(73,227,194,.06); }
+.danger-button { color: var(--red) !important; }
+.user-actions .small-button, .user-actions .text-button { min-height: 32px; }
+@media (max-width: 520px) {
+  .user-actions { justify-content: stretch; }
+  .user-role-select { flex: 1 1 100%; min-height: 36px; }
+}
