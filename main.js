@@ -1,5 +1,5 @@
 import './api-config.js';
-import './github-i18n.js?v=20260820-1';
+import './github-i18n.js?v=20260820-2';
 import { createStore } from './state.js';
 import { loadPreferences, savePreferences } from './storage.js';
 import { loadCatalog, loadMarkets, loadConfirmation } from './market-api.js';
@@ -144,7 +144,7 @@ async function boot() {
     bindEnhancementEvents(root, { selectSymbol, applyPreset, saveNote, savePreset, setSlippage, setAlertCooldown, requestNotifications, setAutoRefresh: (value) => { const next = value === 'off' ? 60 : Number(value); store.setState({ autoRefresh: next }); configureAutoRefresh(next); } });
     bindProTerminalEvents(root, { updateGuardrails });
     bindPaperTradingEvents(root, { openPaperTrade, closePaperTrade });
-    store.subscribe((state) => { render(root, state); renderSignalMeta(root, state); renderEnhancements(root, state); renderProTerminal(root, state); renderSignalInsights(root, state); renderPaperTrading(root, state); renderLiveDataUi(root, state); syncSidebar(root, state); syncChartStreamControl(state); persistIfNeeded(state); }); render(root, store.getState()); renderSignalMeta(root, store.getState()); renderEnhancements(root, store.getState()); renderProTerminal(root, store.getState()); renderSignalInsights(root, store.getState()); renderPaperTrading(root, store.getState()); renderLiveDataUi(root, store.getState()); syncSidebar(root, store.getState()); syncChartStreamControl(store.getState()); configureAutoRefresh(store.getState().autoRefresh); window.setInterval(() => refreshSignalAges(root, t), 5000); await loadExchangeCatalog(store.getState().exchange);
+    store.subscribe((state) => { render(root, state); renderSignalMeta(root, state); renderEnhancements(root, state); renderProTerminal(root, state); renderSignalInsights(root, state); renderPaperTrading(root, state); renderLiveDataUi(root, state); syncSidebar(root, state); syncChartStreamControl(state); persistIfNeeded(state); }); render(root, store.getState()); renderSignalMeta(root, store.getState()); renderEnhancements(root, store.getState()); renderProTerminal(root, store.getState()); renderSignalInsights(root, store.getState()); renderPaperTrading(root, store.getState()); renderLiveDataUi(root, store.getState()); applyTranslations(); syncSidebar(root, store.getState()); syncChartStreamControl(store.getState()); configureAutoRefresh(store.getState().autoRefresh); window.setInterval(() => refreshSignalAges(root, t), 5000); await loadExchangeCatalog(store.getState().exchange);
   } });
 }
 boot();
