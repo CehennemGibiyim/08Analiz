@@ -5,6 +5,7 @@ const SUPABASE_URL = String(config.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_KEY = String(config.SUPABASE_PUBLISHABLE_KEY || config.SUPABASE_ANON_KEY || '');
 const SESSION_KEY = '08-analiz-supabase-session-v1';
 const USERNAME_DOMAIN = 'users.08analiz.local';
+const SUPABASE_REQUEST_TIMEOUT_MS = 15000;
 
 function cleanUsername(value) { return String(value || '').trim(); }
 function authEmail(value) {
@@ -66,12 +67,21 @@ function requestHeaders(token = '', json = false) {
   return { apikey: SUPABASE_KEY, Authorization: `Bearer ${token || SUPABASE_KEY}`, ...(json ? { 'Content-Type': 'application/json' } : {}) };
 }
 async function supabaseRequest(path, options = {}, token = '') {
-  const response = await fetch(`${SUPABASE_URL}${path}`, { ...options, headers: { ...requestHeaders(token, Boolean(options.body)), ...(options.headers || {}) } });
-  const text = await response.text();
-  let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  if (!response.ok) throw Object.assign(new Error(data?.message || data?.msg || data?.error_description || `supabase_${response.status}`), { status: response.status, code: data?.code, data });
-  return data;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), SUPABASE_REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${SUPABASE_URL}${path}`, { ...options, signal: controller.signal, headers: { ...requestHeaders(token, Boolean(options.body)), ...(options.headers || {}) } });
+    const text = await response.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (!response.ok) throw Object.assign(new Error(data?.message || data?.msg || data?.error_description || `supabase_${response.status}`), { status: response.status, code: data?.code, data });
+    return data;
+  } catch (error) {
+    if (error?.name === 'AbortError') throw Object.assign(new Error('backend_unavailable'), { status: 504, code: 'backend_unavailable' });
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 async function readStoredSession() {
   try { const raw = await getStoredItem(SESSION_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
