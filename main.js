@@ -1,5 +1,5 @@
 import './api-config.js';
-import './github-i18n.js';
+import './github-i18n.js?v=20260820-1';
 import { createStore } from './state.js';
 import { loadPreferences, savePreferences } from './storage.js';
 import { loadCatalog, loadMarkets, loadConfirmation } from './market-api.js';
